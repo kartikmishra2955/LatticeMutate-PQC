@@ -24,7 +24,8 @@ export function NewExperiment() {
     setLoading(true)
     try {
       // 1. Create Experiment
-      const createRes = await fetch('/api/experiments/', {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const createRes = await fetch(`${apiUrl}/api/experiments/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -39,7 +40,7 @@ export function NewExperiment() {
       const experiment = await createRes.json()
       
       // 2. Run Experiment
-      await fetch(`/api/experiments/${experiment.id}/run`, { method: 'POST' })
+      await fetch(`${apiUrl}/api/experiments/${experiment.id}/run`, { method: 'POST' })
       
       navigate(`/running?id=${experiment.id}`)
     } catch (e) {

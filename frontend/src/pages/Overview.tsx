@@ -8,7 +8,8 @@ export function Overview() {
   const [backendStatus, setBackendStatus] = useState<"Connected" | "Disconnected">("Disconnected")
 
   useEffect(() => {
-    fetch('/api/status')
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/status`)
       .then(res => res.json())
       .then(data => {
         if (data.status === "ok") {

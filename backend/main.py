@@ -10,7 +10,7 @@ app = FastAPI(title="LatticeMutate-PQC API", version="0.1.0-alpha")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"], # In production, restrict this to your specific frontend domain. For simplicity in this guide, using wildcard.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
