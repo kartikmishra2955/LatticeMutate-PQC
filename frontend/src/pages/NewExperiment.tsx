@@ -75,10 +75,10 @@ export function NewExperiment() {
 
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">2. Parameters to Mutate</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {allParams.map((param) => (
-                <label key={param} className="flex items-center space-x-2 text-sm">
-                  <input type="checkbox" checked={selectedParams.includes(param)} onChange={() => handleParamToggle(param)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label key={param} className="flex items-center space-x-2 text-sm p-1 hover:bg-gray-50 rounded">
+                  <input type="checkbox" checked={selectedParams.includes(param)} onChange={() => handleParamToggle(param)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                   <span>{param}</span>
                 </label>
               ))}
@@ -89,13 +89,13 @@ export function NewExperiment() {
             <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">3. Mutation Range</h3>
             <div className="flex flex-wrap gap-4">
               {allRanges.map((range) => (
-                <label key={range} className="flex items-center space-x-2 text-sm">
-                  <input type="radio" name="mutation_range" checked={mutationRange === range} onChange={() => setMutationRange(range)} className="border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label key={range} className="flex items-center space-x-2 text-sm p-1 hover:bg-gray-50 rounded">
+                  <input type="radio" name="mutation_range" checked={mutationRange === range} onChange={() => setMutationRange(range)} className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500" />
                   <span>{range}</span>
                 </label>
               ))}
-              <label className="flex items-center space-x-2 text-sm">
-                <input type="radio" name="mutation_range" checked={!allRanges.includes(mutationRange)} onChange={() => setMutationRange("")} className="border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <label className="flex items-center space-x-2 text-sm p-1">
+                <input type="radio" name="mutation_range" checked={!allRanges.includes(mutationRange)} onChange={() => setMutationRange("")} className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500" />
                 <span>Custom:</span>
                 <input type="text" placeholder="±%" value={allRanges.includes(mutationRange) ? "" : mutationRange} onChange={e => setMutationRange(e.target.value)} className="w-16 h-8 rounded-md border border-gray-300 px-2 text-xs" />
               </label>
@@ -104,10 +104,10 @@ export function NewExperiment() {
 
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">4. Metrics to Measure</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {['Security estimation', 'Correctness', 'Key generation time', 'Encapsulation time', 'Decapsulation time', 'Memory usage'].map((metric) => (
-                <label key={metric} className="flex items-center space-x-2 text-sm">
-                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" defaultChecked />
+                <label key={metric} className="flex items-center space-x-2 text-sm p-1 hover:bg-gray-50 rounded">
+                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" defaultChecked />
                   <span>{metric}</span>
                 </label>
               ))}
@@ -116,7 +116,7 @@ export function NewExperiment() {
 
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">5. Reproducibility</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div className="flex flex-col space-y-1.5">
                 <label className="text-xs font-medium text-gray-500">Random Seed</label>
                 <input type="text" value={seed} onChange={e => setSeed(e.target.value)} className="h-9 rounded-md border border-gray-300 px-3 py-1 text-sm font-mono" />
@@ -136,7 +136,7 @@ export function NewExperiment() {
       </Card>
       
       <div className="flex justify-end">
-        <Button size="lg" onClick={handleRun} disabled={loading}>
+        <Button size="lg" onClick={handleRun} disabled={loading} className="w-full sm:w-auto">
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Run Experiment
         </Button>

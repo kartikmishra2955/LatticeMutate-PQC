@@ -1,0 +1,25 @@
+{
+  "short_name": "LatticeMutate",
+  "name": "LatticeMutate-PQC: Lattice Sensitivity Engine",
+  "description": "Post-quantum cryptographic parameter mutation and sensitivity research platform",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#2563eb",
+  "background_color": "#f9fafb",
+  "categories": ["utilities", "education", "research"]
+}
