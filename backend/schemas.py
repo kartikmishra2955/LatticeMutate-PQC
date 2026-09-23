@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional, Any, Dict
 from datetime import datetime
 
 class ResultBase(BaseModel):
@@ -14,9 +14,7 @@ class Result(ResultBase):
     id: int
     mutation_id: str
 
-    class Config:
-        orm_mode = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MutationBase(BaseModel):
     id: str
@@ -31,9 +29,7 @@ class Mutation(MutationBase):
     experiment_id: str
     result: Optional[Result] = None
 
-    class Config:
-        orm_mode = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ExperimentCreate(BaseModel):
     scheme: str
@@ -47,10 +43,39 @@ class Experiment(BaseModel):
     scheme: str
     seed: str
     trials: int
+    parameters_to_mutate: Optional[List[str]] = None
+    mutation_ranges: Optional[List[str]] = None
     created_at: datetime
     status: str
     mutations: List[Mutation] = []
 
-    class Config:
-        orm_mode = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class ExperimentSummary(BaseModel):
+    id: str
+    scheme: str
+    seed: str
+    trials: int
+    created_at: datetime
+    status: str
+    mutation_count: int = 0
+    regression_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ExperimentStats(BaseModel):
+    totalExperiments: int
+    mutationsTested: int
+    correctnessTests: int
+    securityEstimates: int
+    flaggedRegressions: int
+
+class AssistantRequest(BaseModel):
+    action: str # "explain" | "anomalies" | "followup" | "discussion"
+    custom_query: Optional[str] = None
+
+class AssistantResponse(BaseModel):
+    title: str
+    summary: str
+    details: List[str]
+    latex_draft: Optional[str] = None

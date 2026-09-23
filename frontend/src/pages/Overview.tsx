@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
-import { baselineMLKEM, experimentStats } from "../data/mockData"
+import { baselineMLKEM, experimentStats as fallbackStats } from "../data/mockData"
 import { Badge } from "../components/ui/Badge"
 import { Database, Shield, Zap, Activity } from "lucide-react"
 
 export function Overview() {
   const [backendStatus, setBackendStatus] = useState<"Connected" | "Disconnected">("Disconnected")
+  const [stats, setStats] = useState(fallbackStats)
+  const [dataSource, setDataSource] = useState("Simulated (Mock)")
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || '';
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    
+    // Check status
     fetch(`${apiUrl}/api/status`)
       .then(res => res.json())
       .then(data => {
         if (data.status === "ok") {
           setBackendStatus("Connected")
+          setDataSource("SQLite Database (Live)")
+          
+          // Fetch stats
+          fetch(`${apiUrl}/api/experiments/stats`)
+            .then(res => res.json())
+            .then(statsData => {
+              if (statsData.totalExperiments > 0) {
+                setStats(statsData)
+              }
+            })
+            .catch(() => {})
         }
       })
-      .catch(() => setBackendStatus("Disconnected"))
+      .catch(() => {
+        setBackendStatus("Disconnected")
+        setDataSource("Simulated (Mock)")
+      })
   }, [])
 
   return (
@@ -35,7 +53,7 @@ export function Overview() {
             <Database className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{experimentStats.totalExperiments}</div>
+            <div className="text-2xl font-bold">{stats.totalExperiments}</div>
           </CardContent>
         </Card>
         <Card>
@@ -44,7 +62,7 @@ export function Overview() {
             <Activity className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{experimentStats.mutationsTested.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{stats.mutationsTested.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -53,7 +71,7 @@ export function Overview() {
             <Shield className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{experimentStats.securityEstimates.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{stats.securityEstimates.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -62,7 +80,7 @@ export function Overview() {
             <Zap className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{experimentStats.flaggedRegressions}</div>
+            <div className="text-2xl font-bold text-red-600">{stats.flaggedRegressions}</div>
           </CardContent>
         </Card>
       </div>
@@ -131,11 +149,11 @@ export function Overview() {
                </div>
                <div className="flex items-center justify-between text-sm">
                  <span className="text-gray-500">Data Source</span>
-                 <span className="font-mono">Simulated (Mock)</span>
+                 <span className="font-mono text-xs">{dataSource}</span>
                </div>
                <div className="flex items-center justify-between text-sm">
                  <span className="text-gray-500">Core Framework</span>
-                 <span className="font-mono">ML-KEM (FIPS 203)</span>
+                 <span className="font-mono text-xs">ML-KEM (NIST FIPS 203)</span>
                </div>
                <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
                  <p className="text-xs text-gray-600">
@@ -149,3 +167,4 @@ export function Overview() {
     </div>
   )
 }
+

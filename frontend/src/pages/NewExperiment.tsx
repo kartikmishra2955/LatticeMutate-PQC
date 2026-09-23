@@ -41,7 +41,7 @@ export function NewExperiment() {
       
       // 2. Run Experiment
       await fetch(`${apiUrl}/api/experiments/${experiment.id}/run`, { method: 'POST' })
-      
+      localStorage.setItem("active_experiment_id", experiment.id)
       navigate(`/running?id=${experiment.id}`)
     } catch (e) {
       console.error(e)
