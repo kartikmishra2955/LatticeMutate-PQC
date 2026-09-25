@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: 'Inter', 'IBM Plex Sans', 'Geist', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Geist Mono', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* ─── Light Theme (default) ─── */
+:root,
+:root.theme-light {
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-surface: #ffffff;
@@ -8,22 +19,91 @@
   --color-text: #1f2937;
   --color-text-muted: #4b5563;
   --color-border: #e5e7eb;
-  
+  --color-sidebar-bg: #ffffff;
+  --color-sidebar-text: #374151;
+  --color-sidebar-active: #eff6ff;
+  --color-sidebar-active-text: #1d4ed8;
+  --color-header-bg: #ffffff;
+  --color-header-border: #e5e7eb;
+  --color-card-bg: #ffffff;
+  --color-card-border: #e5e7eb;
   --color-danger: #dc2626;
   --color-danger-light: #fef2f2;
   --color-danger-border: #f87171;
-
   --color-warning: #d97706;
   --color-warning-light: #fffbeb;
-  
-  --font-sans: 'Inter', 'IBM Plex Sans', 'Geist', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Geist Mono', monospace;
+}
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+/* ─── Dark Theme ─── */
+:root.theme-dark {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+  --color-surface: #1e2028;
+  --color-background: #13151a;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-border: #2d3142;
+  --color-sidebar-bg: #1a1d27;
+  --color-sidebar-text: #cbd5e1;
+  --color-sidebar-active: #1e3a5f;
+  --color-sidebar-active-text: #93c5fd;
+  --color-header-bg: #1a1d27;
+  --color-header-border: #2d3142;
+  --color-card-bg: #1e2028;
+  --color-card-border: #2d3142;
+  --color-danger: #f87171;
+  --color-danger-light: #2d1515;
+  --color-danger-border: #991b1b;
+  --color-warning: #fbbf24;
+  --color-warning-light: #2d1f00;
+}
 
-  --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+/* ─── Midnight Theme ─── */
+:root.theme-midnight {
+  --color-primary: #a78bfa;
+  --color-primary-hover: #c4b5fd;
+  --color-surface: #120f23;
+  --color-background: #0a0812;
+  --color-text: #e2e8f0;
+  --color-text-muted: #9ca3af;
+  --color-border: #2e2545;
+  --color-sidebar-bg: #100d1f;
+  --color-sidebar-text: #c4b5fd;
+  --color-sidebar-active: #1e1640;
+  --color-sidebar-active-text: #ddd6fe;
+  --color-header-bg: #100d1f;
+  --color-header-border: #2e2545;
+  --color-card-bg: #120f23;
+  --color-card-border: #2e2545;
+  --color-danger: #f87171;
+  --color-danger-light: #2d0a0a;
+  --color-danger-border: #7f1d1d;
+  --color-warning: #fbbf24;
+  --color-warning-light: #1c1000;
+}
+
+/* ─── Forest Theme ─── */
+:root.theme-forest {
+  --color-primary: #10b981;
+  --color-primary-hover: #34d399;
+  --color-surface: #0f1f17;
+  --color-background: #091410;
+  --color-text: #d1fae5;
+  --color-text-muted: #6ee7b7;
+  --color-border: #1a3328;
+  --color-sidebar-bg: #0d1a13;
+  --color-sidebar-text: #a7f3d0;
+  --color-sidebar-active: #143d26;
+  --color-sidebar-active-text: #6ee7b7;
+  --color-header-bg: #0d1a13;
+  --color-header-border: #1a3328;
+  --color-card-bg: #0f1f17;
+  --color-card-border: #1a3328;
+  --color-danger: #f87171;
+  --color-danger-light: #2d0a0a;
+  --color-danger-border: #7f1d1d;
+  --color-warning: #fbbf24;
+  --color-warning-light: #1c1000;
 }
 
 @layer base {
@@ -31,8 +111,8 @@
     font-family: var(--font-sans);
     background-color: var(--color-background);
     color: var(--color-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
-  
   body {
     @apply m-0 p-0 antialiased;
   }

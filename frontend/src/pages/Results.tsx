@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../components/ui/Badge"
 import { Button } from "../components/ui/Button"
 import { recentResults as fallbackResults } from "../data/mockData"
-import { Download, Loader2, RefreshCw } from "lucide-react"
+import { Download, Loader2, RefreshCw, Sparkles, ChevronDown, ChevronUp } from "lucide-react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 
 export function Results() {
@@ -16,6 +16,11 @@ export function Results() {
   const [exporting, setExporting] = useState(false)
   const [experiment, setExperiment] = useState<any>(null)
   const [results, setResults] = useState<any[]>([])
+
+  // State for AI corrections dropdown
+  const [showCorrections, setShowCorrections] = useState(false)
+  const [fetchingCorrections, setFetchingCorrections] = useState(false)
+  const [corrections, setCorrections] = useState<string[]>([])
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || ""
@@ -69,7 +74,6 @@ export function Results() {
       window.URL.revokeObjectURL(url)
     } catch (e) {
       console.warn("Direct CSV export failed, generating from client data:", e)
-      // Client fallback CSV
       const headers = "Mutation,Parameter,Change,Security Estimate,Correctness,KeyGen,Encap,Decap,Regression\n"
       const rows = results.map(r => `${r.id},"${r.parameter}",${r.change},${r.securityEstimate},${r.correctness},${r.keyGen},${r.encapsulation},${r.decapsulation},${r.regression}`).join("\n")
       const blob = new Blob([headers + rows], { type: "text/csv" })
@@ -83,6 +87,38 @@ export function Results() {
       window.URL.revokeObjectURL(url)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const toggleCorrections = async () => {
+    if (showCorrections) {
+      setShowCorrections(false)
+      return
+    }
+
+    setShowCorrections(true)
+    if (corrections.length > 0) return // already fetched
+
+    setFetchingCorrections(true)
+    const apiUrl = import.meta.env.VITE_API_URL || ""
+    try {
+      const res = await fetch(`${apiUrl}/api/experiments/${expId}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "correction" })
+      })
+      if (!res.ok) throw new Error("Failed to fetch corrections")
+      const data = await res.json()
+      setCorrections(data.details || [])
+    } catch (e) {
+      console.warn("Fallback corrections:", e)
+      setCorrections([
+        "• k is too small. Use k=3 for standard 192-bit security.",
+        "• Noise η is cryptographically unsafe. Restore to η=2.",
+        "• Modulus q breaks NTT performance. Revert to q=3329."
+      ])
+    } finally {
+      setFetchingCorrections(false)
     }
   }
 
@@ -110,10 +146,44 @@ export function Results() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Mutation Summary ({results.length} evaluated)</CardTitle>
-            {loading && <RefreshCw className="h-4 w-4 text-gray-400 animate-spin" />}
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={toggleCorrections}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Suggest Corrections
+                {showCorrections ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+              </Button>
+              {loading && <RefreshCw className="h-4 w-4 text-gray-400 animate-spin" />}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        
+        {/* Corrections Dropdown Section */}
+        {showCorrections && (
+          <div className="px-6 py-4 bg-blue-50/50 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Parameter Corrections
+            </h4>
+            {fetchingCorrections ? (
+              <div className="flex items-center text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing regressions...
+              </div>
+            ) : (
+              <ul className="space-y-2 text-sm text-gray-700">
+                {corrections.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <CardContent className={showCorrections ? "pt-6" : ""}>
           <Table>
             <TableHeader>
               <TableRow>

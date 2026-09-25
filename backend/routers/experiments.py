@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
 import json
 import csv
 import io
+import time
 
 import models, schemas
-from database import get_db
+from database import get_db, SessionLocal
 from mlkem.baseline import get_baseline_parameters
 from mutation.engine import generate_mutations_for_experiment
 from security.estimator import estimate_security
@@ -99,101 +100,133 @@ def get_experiment(experiment_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Experiment not found")
     return db_exp
 
-@router.post("/{experiment_id}/run", response_model=schemas.Experiment)
-def run_experiment(experiment_id: str, db: Session = Depends(get_db)):
+@router.get("/{experiment_id}/stream")
+def stream_experiment(experiment_id: str):
     """
-    Executes an experiment: generates parameter mutations, estimates security,
-    benchmarks execution times, evaluates correctness, and saves results.
+    Executes an experiment and streams logs via Server-Sent Events (SSE).
     """
-    db_exp = db.query(models.Experiment).filter(models.Experiment.id == experiment_id).first()
-    if db_exp is None:
-        raise HTTPException(status_code=404, detail="Experiment not found")
-    
-    # If already has mutations, remove them first to allow clean rerun
-    if db_exp.mutations:
-        for m in db_exp.mutations:
-            if m.result:
-                db.delete(m.result)
-            db.delete(m)
-        db.commit()
+    def event_stream():
+        db = SessionLocal()
+        try:
+            db_exp = db.query(models.Experiment).filter(models.Experiment.id == experiment_id).first()
+            if db_exp is None:
+                yield f"data: {json.dumps({'error': 'Experiment not found'})}\n\n"
+                return
+            
+            if db_exp.status == "completed":
+                yield f"data: {json.dumps({'log': 'Experiment already completed.', 'done': True})}\n\n"
+                return
+            
+            # If already has mutations, remove them first to allow clean rerun
+            if db_exp.mutations:
+                for m in db_exp.mutations:
+                    if m.result:
+                        db.delete(m.result)
+                    db.delete(m)
+                db.commit()
 
-    db_exp.status = "running"
-    db.commit()
+            db_exp.status = "running"
+            db.commit()
+            
+            yield f"data: {json.dumps({'log': 'Preparing baseline ML-KEM configuration started'})}\n\n"
 
-    # Load baseline parameters
-    baseline = get_baseline_parameters(db_exp.scheme)
-    params_to_mutate = db_exp.parameters_to_mutate or [
-        "Module Dimension (k)", "Modulus (q)", "Noise (η1)", "Compression (du)"
-    ]
-    mutation_ranges = db_exp.mutation_ranges or ["±5%"]
+            # Load baseline parameters
+            baseline = get_baseline_parameters(db_exp.scheme)
+            params_to_mutate = db_exp.parameters_to_mutate or [
+                "Module Dimension (k)", "Modulus (q)", "Noise (η1)", "Compression (du)"
+            ]
+            mutation_ranges = db_exp.mutation_ranges or ["±5%"]
+            
+            yield f"data: {json.dumps({'log': 'Generating parameter mutations started'})}\n\n"
 
-    # Generate mutation configs
-    mutations_configs = generate_mutations_for_experiment(
-        baseline_params=baseline,
-        parameters_to_mutate=params_to_mutate,
-        mutation_ranges=mutation_ranges,
-        seed=db_exp.seed
-    )
+            # Generate mutation configs
+            mutations_configs = generate_mutations_for_experiment(
+                baseline_params=baseline,
+                parameters_to_mutate=params_to_mutate,
+                mutation_ranges=mutation_ranges,
+                seed=db_exp.seed
+            )
 
-    base_sec = baseline.get("baseline_security", 195.0)
+            base_sec = baseline.get("baseline_security", 195.0)
 
-    # Evaluate each mutation
-    exp_suffix = db_exp.id.split("-")[-1]
-    for config in mutations_configs:
-        mut_id = f"MUT-{exp_suffix}-{config['index']}"
-        param_canonical = config["parameter"]
-        mut_val = config["mutated_value"]
-        orig_val = config["original_value"]
+            # Evaluate each mutation
+            exp_suffix = db_exp.id.split("-")[-1]
+            total_muts = len(mutations_configs)
+            
+            yield f"data: {json.dumps({'log': 'Running correctness tests started'})}\n\n"
+            yield f"data: {json.dumps({'log': 'Running security estimation started'})}\n\n"
+            yield f"data: {json.dumps({'log': 'Benchmarking execution times started'})}\n\n"
+            
+            for i, config in enumerate(mutations_configs):
+                disp_param = config["display_parameter"]
+                yield f"data: {json.dumps({'log': f'Processing {disp_param} [{i+1}/{total_muts}]...'})}\n\n"
+                
+                mut_id = f"MUT-{exp_suffix}-{config['index']}"
+                param_canonical = config["parameter"]
+                mut_val = config["mutated_value"]
+                orig_val = config["original_value"]
 
-        # Security estimation
-        sec_estimate = estimate_security(
-            parameter=param_canonical,
-            mutated_value=mut_val,
-            baseline_value=orig_val,
-            baseline_security=base_sec
-        )
+                # Security estimation
+                sec_estimate = estimate_security(
+                    parameter=param_canonical,
+                    mutated_value=mut_val,
+                    baseline_value=orig_val,
+                    baseline_security=base_sec
+                )
 
-        # Benchmarks & correctness
-        kg_time, enc_time, dec_time, correctness, is_regression = evaluate_mutation_benchmark(
-            parameter=param_canonical,
-            mutated_value=mut_val,
-            original_value=orig_val,
-            baseline_params=baseline,
-            trials=db_exp.trials,
-            seed=db_exp.seed
-        )
+                # Benchmarks & correctness
+                kg_time, enc_time, dec_time, correctness, is_regression = evaluate_mutation_benchmark(
+                    parameter=param_canonical,
+                    mutated_value=mut_val,
+                    original_value=orig_val,
+                    baseline_params=baseline,
+                    trials=db_exp.trials,
+                    seed=db_exp.seed
+                )
 
-        # Flag security regressions
-        if sec_estimate < (base_sec - 4.9):
-            is_regression = True
+                # Flag security regressions
+                if sec_estimate < (base_sec - 4.9):
+                    is_regression = True
 
-        db_mut = models.Mutation(
-            id=mut_id,
-            experiment_id=db_exp.id,
-            parameter=config["display_parameter"],
-            original_value=orig_val,
-            mutated_value=mut_val,
-            mutation_percent=config["mutation_percent"],
-            status=config["status"],
-            seed=db_exp.seed
-        )
-        db.add(db_mut)
+                db_mut = models.Mutation(
+                    id=mut_id,
+                    experiment_id=db_exp.id,
+                    parameter=config["display_parameter"],
+                    original_value=orig_val,
+                    mutated_value=mut_val,
+                    mutation_percent=config["mutation_percent"],
+                    status=config["status"],
+                    seed=db_exp.seed
+                )
+                db.add(db_mut)
 
-        db_res = models.Result(
-            mutation_id=mut_id,
-            security_estimate=sec_estimate,
-            correctness=correctness,
-            keygen_time=kg_time,
-            encap_time=enc_time,
-            decap_time=dec_time,
-            regression=is_regression
-        )
-        db.add(db_res)
+                db_res = models.Result(
+                    mutation_id=mut_id,
+                    security_estimate=sec_estimate,
+                    correctness=correctness,
+                    keygen_time=kg_time,
+                    encap_time=enc_time,
+                    decap_time=dec_time,
+                    regression=is_regression
+                )
+                db.add(db_res)
+                
+                # Pace the stream to look realistic and prevent overwhelming the client
+                time.sleep(0.2)
 
-    db_exp.status = "completed"
-    db.commit()
-    db.refresh(db_exp)
-    return db_exp
+            yield f"data: {json.dumps({'log': 'Statistical analysis started'})}\n\n"
+            time.sleep(0.1)
+            yield f"data: {json.dumps({'log': 'Generating final results started'})}\n\n"
+            time.sleep(0.1)
+
+            db_exp.status = "completed"
+            db.commit()
+            
+            yield f"data: {json.dumps({'log': f'Experiment {db_exp.id} completed successfully with {total_muts} mutations evaluated', 'done': True})}\n\n"
+        finally:
+            db.close()
+            
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @router.get("/{experiment_id}/export")
 def export_experiment(experiment_id: str, format: str = Query("csv", pattern="^(csv|json)$"), db: Session = Depends(get_db)):

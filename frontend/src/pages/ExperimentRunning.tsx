@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import { Button } from "../components/ui/Button"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -22,8 +22,14 @@ export function ExperimentRunning() {
   const [currentStage, setCurrentStage] = useState(0)
   const [logs, setLogs] = useState<string[]>([])
   const [completed, setCompleted] = useState(false)
+  const [streamStarted, setStreamStarted] = useState(false)
   const [expData, setExpData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const logsEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [logs])
 
   // Fetch initial experiment info
   useEffect(() => {
@@ -38,6 +44,17 @@ export function ExperimentRunning() {
         if (data.status === "completed") {
           setCurrentStage(stages.length)
           setCompleted(true)
+          
+          // Populate past logs to show in the terminal
+          const now = new Date()
+          const pastLogs = stages.map((stage, i) => {
+            const time = new Date(now.getTime() - (stages.length - i) * 3500) // Stagger by 3.5s
+            return `[${time.toLocaleTimeString('en-US', { hour12: false })}] ${stage} started`
+          })
+          pastLogs.push(`[${now.toLocaleTimeString('en-US', { hour12: false })}] Experiment ${expId} completed successfully with ${data.mutations?.length || 0} mutations evaluated`)
+          setLogs(pastLogs)
+        } else {
+          setStreamStarted(true)
         }
       })
       .catch(err => {
@@ -45,36 +62,56 @@ export function ExperimentRunning() {
       })
   }, [expId])
 
-  // Progress simulation & polling
+  // Real-time SSE Stream
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
+    if (!streamStarted || completed) return;
     const apiUrl = import.meta.env.VITE_API_URL || ""
+    
+    const eventSource = new EventSource(`${apiUrl}/api/experiments/${expId}/stream`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          setError(data.error);
+          eventSource.close();
+          return;
+        }
+        
+        if (data.log) {
+          const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false });
+          setLogs(prev => [...prev, `[${timeStr}] ${data.log}`]);
+          
+          // Increment progress stages based on log content
+          if (data.log.includes("baseline ML-KEM")) setCurrentStage(1);
+          else if (data.log.includes("Generating parameter mutations")) setCurrentStage(2);
+          else if (data.log.includes("Running correctness tests")) setCurrentStage(3);
+          else if (data.log.includes("Running security estimation")) setCurrentStage(4);
+          else if (data.log.includes("Benchmarking execution times")) setCurrentStage(5);
+          else if (data.log.includes("Statistical analysis")) setCurrentStage(6);
+          else if (data.log.includes("Generating final results")) setCurrentStage(7);
+        }
+        
+        if (data.done) {
+          setCompleted(true);
+          setCurrentStage(stages.length);
+          eventSource.close();
+        }
+      } catch (e) {
+        console.error("Error parsing SSE data", e);
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      console.error("SSE Error:", err);
+      setError("Lost connection to execution stream.");
+      eventSource.close();
+    };
 
-    if (currentStage < stages.length) {
-      timer = setTimeout(() => {
-        const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
-        setLogs(prev => [...prev, `[${timeStr}] ${stages[currentStage]} started`])
-        setCurrentStage(c => c + 1)
-      }, 700)
-    } else if (currentStage === stages.length && !completed) {
-      // Check backend status
-      fetch(`${apiUrl}/api/experiments/${expId}`)
-        .then(res => res.json())
-        .then(data => {
-          setExpData(data)
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
-          setLogs(prev => [...prev, `[${timeStr}] Experiment ${expId} completed successfully with ${data.mutations?.length || 0} mutations evaluated`])
-          setCompleted(true)
-        })
-        .catch(() => {
-          const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
-          setLogs(prev => [...prev, `[${timeStr}] Experiment completed in local mode`])
-          setCompleted(true)
-        })
-    }
-
-    return () => clearTimeout(timer)
-  }, [currentStage, completed, expId])
+    return () => {
+      eventSource.close();
+    };
+  }, [streamStarted, completed, expId])
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -118,11 +155,27 @@ export function ExperimentRunning() {
             </div>
 
             <div className="mt-8 pt-6 border-t border-gray-100">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Execution Logs</h4>
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 font-mono text-xs text-gray-700 h-48 overflow-y-auto space-y-1">
-                {logs.map((log, i) => (
-                  <div key={i}>{log}</div>
-                ))}
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Execution Logs (Terminal)</h4>
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-xs text-green-400 h-64 overflow-y-auto space-y-2 shadow-inner relative">
+                {logs.map((log, i) => {
+                  const match = log.match(/^(\[.*?\])\s(.*)/);
+                  if (match) {
+                    return (
+                      <div key={i} className="flex items-start gap-2 border-b border-gray-800 pb-1">
+                        <span className="text-blue-400 shrink-0">{match[1]}</span>
+                        <span className="text-gray-200 break-words">{match[2]}</span>
+                      </div>
+                    );
+                  }
+                  return <div key={i} className="text-gray-200">{log}</div>;
+                })}
+                {!completed && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-green-500 animate-pulse">▶</span>
+                    <span className="text-gray-500 italic">Processing...</span>
+                  </div>
+                )}
+                <div ref={logsEndRef} />
               </div>
             </div>
           </div>

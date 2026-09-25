@@ -89,6 +89,15 @@ export function Analysis() {
           ],
           latex_draft: `\\subsection{Parameter Sensitivity Analysis}\nOur empirical perturbation analysis of ML-KEM demonstrates that ring modulus $q$ and noise variance $\\eta_1$ represent critical sensitivity choke points. Negative perturbation of $q$ diminishes the error threshold $q/4$, inducing decapsulation failures without substantial security gain. Conversely, decreasing noise parameter $\\eta_1$ sharply degrades bit security against BKZ reduction.`
         })
+      } else if (action === "correction") {
+        setAssistantOutput({
+          title: "Suggested Parameter Corrections",
+          summary: "Cryptographic corrections to resolve detected security and correctness regressions.",
+          details: [
+            "Noise η is cryptographically unsafe. Restore to baseline to prevent rapid lattice reduction attacks.",
+            "Modulus q breaks NTT performance or causes decryption failures. Revert to the standard prime q=3329."
+          ]
+        })
       }
     } finally {
       setLoading(false)
@@ -205,6 +214,15 @@ export function Analysis() {
                 className="w-full justify-between font-normal text-left text-xs h-auto py-2.5"
               >
                 <span>Draft discussion paragraph</span>
+                <ArrowRight className="h-3 w-3 text-gray-400" />
+              </Button>
+              <Button 
+                variant={activeAction === "correction" ? "default" : "outline"}
+                onClick={() => handleAssistantAction("correction")}
+                disabled={loading}
+                className="w-full justify-between font-normal text-left text-xs h-auto py-2.5"
+              >
+                <span>Suggest parameter corrections</span>
                 <ArrowRight className="h-3 w-3 text-gray-400" />
               </Button>
               

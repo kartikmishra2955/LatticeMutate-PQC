@@ -1,5 +1,18 @@
 import random
+import time
+import os
+import ctypes
 from typing import Dict, Any, Tuple
+
+# Try to load the C simulation library
+kyber_sim = None
+try:
+    # Build path to the compiled library
+    lib_path = os.path.join(os.path.dirname(__file__), "c_src", "libkyber_sim.dylib")
+    kyber_sim = ctypes.CDLL(lib_path)
+    kyber_sim.simulate_kyber_workload.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+except Exception as e:
+    print(f"Failed to load C benchmark library: {e}")
 
 def evaluate_mutation_benchmark(
     parameter: str,
@@ -24,31 +37,66 @@ def evaluate_mutation_benchmark(
 
     jitter = (rng.random() - 0.5) * 0.005 # ±0.0025ms jitter
 
-    # Time scaling by parameter
-    if parameter in ["k", "Module Dimension (k)"]:
-        # Matrix dimension scales as (k_new / k_orig)^2
-        k_orig = baseline_params.get("k", 3)
-        time_ratio = (mutated_value / k_orig) ** 1.8
-        keygen_time = round(base_keygen * time_ratio + jitter, 3)
-        encap_time = round(base_encap * time_ratio + jitter, 3)
-        decap_time = round(base_decap * time_ratio + jitter, 3)
-    elif parameter in ["n", "Dimension (n)"]:
-        n_orig = baseline_params.get("n", 256)
-        time_ratio = (mutated_value / n_orig) * 1.1
-        keygen_time = round(base_keygen * time_ratio + jitter, 3)
-        encap_time = round(base_encap * time_ratio + jitter, 3)
-        decap_time = round(base_decap * time_ratio + jitter, 3)
-    elif parameter in ["eta1", "Noise (η1)", "η1"]:
-        # Noise sampling time is a fraction of total time
-        eta_orig = baseline_params.get("eta1", 2)
-        ratio = mutated_value / eta_orig
-        keygen_time = round(base_keygen * (1.0 + (ratio - 1.0) * 0.08) + jitter, 3)
-        encap_time = round(base_encap * (1.0 + (ratio - 1.0) * 0.08) + jitter, 3)
-        decap_time = round(base_decap + jitter, 3)
+    # If the C library is loaded, use it for real CPU timing
+    if kyber_sim is not None:
+        # Determine actual parameters for this mutation
+        c_k = int(baseline_params.get("k", 3))
+        c_n = int(baseline_params.get("n", 256))
+        c_q = int(baseline_params.get("q", 3329))
+        c_eta = int(baseline_params.get("eta1", 2))
+        
+        if parameter in ["k", "Module Dimension (k)"]:
+            c_k = max(1, int(mutated_value))
+        elif parameter in ["n", "Dimension (n)"]:
+            c_n = max(128, int(mutated_value))
+        elif parameter in ["q", "Modulus (q)"]:
+            c_q = max(2, int(mutated_value))
+        elif parameter in ["eta1", "Noise (η1)", "η1"]:
+            c_eta = max(1, int(mutated_value))
+
+        # Run 5000 iterations in C to get a measurable CPU time profile
+        inner_trials = 5000
+        
+        t0 = time.perf_counter()
+        kyber_sim.simulate_kyber_workload(c_k, c_n, c_q, c_eta, inner_trials)
+        t1 = time.perf_counter()
+        
+        # Calculate raw milliseconds per trial
+        raw_ms = ((t1 - t0) * 1000.0) / inner_trials
+        
+        # Apply calibration factor because our C simulation is simpler than full Kyber (which includes SHA3 hashing, etc.)
+        calibration = 25.0
+        calibrated_ms = raw_ms * calibration
+        
+        # Derive proportional times
+        keygen_time = round(calibrated_ms * 0.8 + jitter, 3)
+        encap_time = round(calibrated_ms * 1.0 + jitter, 3)
+        decap_time = round(calibrated_ms * 1.2 + jitter, 3)
+        
     else:
-        keygen_time = round(base_keygen + jitter, 3)
-        encap_time = round(base_encap + jitter, 3)
-        decap_time = round(base_decap + jitter, 3)
+        # Fallback to pure math simulation
+        if parameter in ["k", "Module Dimension (k)"]:
+            k_orig = baseline_params.get("k", 3)
+            time_ratio = (mutated_value / k_orig) ** 1.8
+            keygen_time = round(base_keygen * time_ratio + jitter, 3)
+            encap_time = round(base_encap * time_ratio + jitter, 3)
+            decap_time = round(base_decap * time_ratio + jitter, 3)
+        elif parameter in ["n", "Dimension (n)"]:
+            n_orig = baseline_params.get("n", 256)
+            time_ratio = (mutated_value / n_orig) * 1.1
+            keygen_time = round(base_keygen * time_ratio + jitter, 3)
+            encap_time = round(base_encap * time_ratio + jitter, 3)
+            decap_time = round(base_decap * time_ratio + jitter, 3)
+        elif parameter in ["eta1", "Noise (η1)", "η1"]:
+            eta_orig = baseline_params.get("eta1", 2)
+            ratio = mutated_value / eta_orig
+            keygen_time = round(base_keygen * (1.0 + (ratio - 1.0) * 0.08) + jitter, 3)
+            encap_time = round(base_encap * (1.0 + (ratio - 1.0) * 0.08) + jitter, 3)
+            decap_time = round(base_decap + jitter, 3)
+        else:
+            keygen_time = round(base_keygen + jitter, 3)
+            encap_time = round(base_encap + jitter, 3)
+            decap_time = round(base_decap + jitter, 3)
 
     keygen_time = max(0.01, keygen_time)
     encap_time = max(0.01, encap_time)

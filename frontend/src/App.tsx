@@ -10,24 +10,27 @@ import { Mutations } from './pages/Mutations'
 import { Analysis } from './pages/Analysis'
 import { Export } from './pages/Export'
 import { Experiments } from './pages/Experiments'
+import { ThemeProvider } from './lib/ThemeContext'
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Overview />} />
-          <Route path="new" element={<NewExperiment />} />
-          <Route path="running" element={<ExperimentRunning />} />
-          <Route path="experiments" element={<Experiments />} />
-          <Route path="results" element={<Results />} />
-          <Route path="sensitivity" element={<SensitivityAnalysis />} />
-          <Route path="mutations" element={<Mutations />} />
-          <Route path="analysis" element={<Analysis />} />
-          <Route path="export" element={<Export />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="new" element={<NewExperiment />} />
+            <Route path="running" element={<ExperimentRunning />} />
+            <Route path="experiments" element={<Experiments />} />
+            <Route path="results" element={<Results />} />
+            <Route path="sensitivity" element={<SensitivityAnalysis />} />
+            <Route path="mutations" element={<Mutations />} />
+            <Route path="analysis" element={<Analysis />} />
+            <Route path="export" element={<Export />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

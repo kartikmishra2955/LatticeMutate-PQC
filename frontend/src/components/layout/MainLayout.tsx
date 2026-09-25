@@ -7,7 +7,7 @@ export function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: "var(--color-background)" }}>
       <Sidebar isMobileOpen={isMobileOpen} onCloseMobile={() => setIsMobileOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         <Header onToggleMenu={() => setIsMobileOpen(prev => !prev)} />
@@ -20,4 +20,5 @@ export function MainLayout() {
     </div>
   )
 }
+
 

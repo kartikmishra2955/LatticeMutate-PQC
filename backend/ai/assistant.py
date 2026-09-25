@@ -91,6 +91,34 @@ def interpret_experiment(action: str, experiment_data: Dict[str, Any]) -> Dict[s
             "latex_draft": latex
         }
 
+    elif action == "correction":
+        corrections = []
+        for m in regressions:
+            param = m.get("parameter")
+            bad_val = m.get("mutated_value")
+            
+            # Simple rules mapping bad parameters back to FIPS 203 NIST safe defaults
+            if param in ["k", "Module Dimension (k)"]:
+                corrections.append(f"• k={bad_val} is too small. Use k=3 for standard 192-bit security (ML-KEM-768) or k=4 for 256-bit security (ML-KEM-1024).")
+            elif param in ["eta1", "eta2", "Noise (η1)", "Noise (η2)", "η1", "η2"]:
+                corrections.append(f"• Noise η={bad_val} is cryptographically unsafe. Restore to η=2 to prevent rapid lattice reduction attacks while maintaining correctness.")
+            elif param in ["q", "Modulus (q)"]:
+                corrections.append(f"• Modulus q={bad_val} breaks NTT performance or causes decryption failures. Revert to the prime q=3329 (which satisfies q ≡ 1 mod 256).")
+            elif param in ["du", "dv", "Compression (du)", "Compression (dv)"]:
+                corrections.append(f"• Over-compression ({bad_val} bits) destroys ciphertext data. Correct to du=10, dv=4 for optimal bandwidth-to-correctness ratio.")
+            else:
+                corrections.append(f"• Revert {param} from {bad_val} to its original baseline to restore security bounds.")
+
+        if not corrections:
+            corrections.append("All tested parameters are currently within safe cryptographic bounds. No corrections needed!")
+
+        return {
+            "title": "Suggested Parameter Corrections",
+            "summary": f"Generated {len(corrections)} cryptographic corrections to resolve detected security and correctness regressions.",
+            "details": list(set(corrections)),
+            "latex_draft": None
+        }
+
     return {
         "title": "Research Assistant Response",
         "summary": "Action completed.",
